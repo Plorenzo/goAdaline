@@ -6,13 +6,12 @@ import (
 	"encoding/csv"
 	"math/rand"
 	"strconv"
-	"reflect"
-	"time"
+	
 )
 
 const trainPath = "/Users/plorenzo/dev/uni/rna/final/train.csv"
-const validatePath = "/Users/plorenzo/dev/uni/rna/final/train.csv"
-const testPath = "/Users/plorenzo/dev/uni/rna/final/train.csv"
+const validatePath = "/Users/plorenzo/dev/uni/rna/final/validate.csv"
+const testPath = "/Users/plorenzo/dev/uni/rna/final/test.csv"
 
 // TODO: refacto to improve performance (S.O. QUESTION)
 func readCSV(filepath string) ([][]float64, []float64) {
@@ -52,7 +51,6 @@ func readCSV(filepath string) ([][]float64, []float64) {
 func initWeights(length int) []float64 {
 
 	weights := make([]float64, length)
-
 	//Inits the slice with random numbers betwen [-1, 1]
 	for index := range weights {
 		w := rand.Float64()
@@ -63,73 +61,78 @@ func initWeights(length int) []float64 {
 		} else {
 			weights[index] = w * -1
 		}
-		
 	}
 	return weights
 }
 
 func main() {
 
-	start := time.Now()
-
 	//Read data from csv file
 	data, expectedY := readCSV(trainPath)
+	validateData, valExpectedY := readCSV(validatePath)
+	testData, testExpectedY := readCSV(testPath)
 
 	//PARAMETERS
-	var cylces int = 10000
-	var learningRate float64 = 0.1
-
-	// Sanity checking 
-	fmt.Println("Size data: ")
-	fmt.Println(len(data[0]))
-	fmt.Println(len(data))
-	fmt.Println("First data value: ")
-	fmt.Println(data[0][0])
-	fmt.Println("Data type: ")
-	fmt.Println(reflect.TypeOf(data))
-	fmt.Println("Expected Y: ")
-	fmt.Println(expectedY[0])
-
-	inputLength := len(data[0])
-	weights := initWeights(inputLength)
+	var cylces int = 100
+	var learningRate float64 = 0.2
 	
-	var errors []float64
+	weights := initWeights(len(data[0]))
+		
+	var estimate float64
+	var errorData float64
+	var errorsTrain []float64
+	var errorsValidate []float64
+	var errorsTest float64
 	
 	// Learning
 	for i := 0; i < cylces; i++ {
 		for j := range data {
 			//Calculate estimate
-			var estimate float64 = 0
+			estimate = 0
 			for x := range data[j]{
 				estimate += data[j][x] * weights[x]
 			}
-		
-			// Update weights (range passes calues as a copy)
-			for x := 0 ; x < len(weights); x++ {
-				weights[x] = learningRate * (expectedY[j] - estimate) * data[j][x]
+			
+			// Update weights (range passes values as a copy)
+			for x := 0; x < len(weights); x++ {
+				weights[x] += learningRate * (expectedY[j] - estimate) * data[j][x]
 			}
 		}
-		
-		// Measure cylce error
-		var totalErr float64 = 0
-		
+
+		// Compute cylce train error
+		errorData = 0
 		for j := range data {
-				var estimate float64 = 0
-				for x := range data[j] {
-					estimate += data[j][x] * weights[x]
-				} 
-				// Cuadratic error E = (Yd - Ye)^2
-				totalErr += (expectedY[j] - estimate) * (expectedY[j] - estimate)
+			estimate = 0
+			for x := range data[j] {
+				estimate += data[j][x] * weights[x]
+			}
+			// Cuadratic error E = (Yd - Ye)^2
+			errorData += (expectedY[j] - estimate) * (expectedY[j] - estimate)
 		}
-		errors = append(errors, totalErr / float64(len(errors)))
-	}
+		errorsTrain = append(errorsTrain, errorData / float64(len(data)))
 	
+		// Compute cylce validate error
+		errorData = 0
+		for j := range validateData {
+			estimate = 0
+			for x := range validateData[j] {
+				estimate += validateData[j][x] * weights[x]
+			}
+			errorData += (valExpectedY[j] - estimate) * (valExpectedY[j] - estimate)
+		}
+		errorsValidate = append(errorsValidate, errorData / float64(len(validateData)))
+	}
 
-	//TODO save global error to file
-
-	elapsed := time.Since(start)
-	fmt	.Println(elapsed)
-	//fmt.Println(errors)
-
-
+	// Compute test error
+	errorData = 0
+	for j := range testData {
+		estimate = 0
+		for x := range testData[j] {
+			estimate += testData[j][x] * weights[x]
+		}
+		errorData += (testExpectedY[j] - estimate) * (testExpectedY[j] - estimate)
+	}
+	errorsTest = errorData / float64(len(testData))
+	fmt.Println(errorsTest)
 }
+
