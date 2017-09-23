@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"math/rand"
 	"strconv"
+	"flag"
 )
 
 const trainPath = "/Users/plorenzo/dev/uni/rna/final/train.csv"
@@ -109,15 +110,24 @@ func computeError(data [][]float64, expected []float64, weights []float64) float
 
 func main() {
 
+	var (
+		folderPath = flag.String("path", ".", "Path to the datasets")
+		cycles = flag.Int("cycles", 1, "Nº of training cycles")
+		learningRate = flag.Float64("lr", 0.1, "Learning rate of the neuron")
+	)
+	flag.Parse()
+
+	trainPath := *folderPath + "train.csv"
+	validatePath := *folderPath + "validate.csv"
+	testPath := *folderPath + "test.csv"
+
+	
 	//Read data from csv file
 	data, expectedY := readCSV(trainPath)
 	validateData, valExpectedY := readCSV(validatePath)
 	testData, testExpectedY := readCSV(testPath)
-
-	//PARAMETERS
-	var cylces int = 57
-	var learningRate float64 = 0.01
 	
+	//Init weights randomly [-1,1]
 	weights := initWeights(len(data[0]))
 		
 	var estimate float64
@@ -126,7 +136,7 @@ func main() {
 	var errorsTest float64
 	
 	// Learning
-	for i := 0; i < cylces; i++ {
+	for i := 0; i < *cycles; i++ {
 		for j := range data {
 			//Calculate estimate
 			estimate = 0
@@ -136,14 +146,13 @@ func main() {
 			
 			// Update weights (range passes values as a copy)
 			for x := 0; x < len(weights); x++ {
-				weights[x] += learningRate * (expectedY[j] - estimate) * data[j][x]
+				weights[x] += *learningRate * (expectedY[j] - estimate) * data[j][x]
 			}
 		}
 
 		// Compute cylce train error
 		errorsTrain = append(errorsTrain, computeError(data, expectedY, weights))
 		errorsValidate = append(errorsValidate, computeError(validateData, valExpectedY, weights))
-
 	}
 
 	errorsTest = computeError(testData, testExpectedY, weights)
