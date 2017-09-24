@@ -12,11 +12,13 @@ import (
 func main() {
 
 	var (
-		folderPath   = flag.String("path", ".", "Path to the datasets")
-		cycles       = flag.Int("cycles", 1, "Nº of training cycles")
-		learningRate = flag.Float64("lr", 0.1, "Learning rate of the neuron")
+		folderPath   	= flag.String("path", ".", "Path to the datasets")
+		cycles			= flag.Int("cycles", 1, "Nº of training cycles")
+		learningRate	= flag.Float64("lr", 0.1, "Learning rate of the neuron")
+		outputPath		= flag.String("out", ".", "Path to save the output file")
 	)
 	flag.Parse()
+
 
 	trainPath := *folderPath + "train.csv"
 	validatePath := *folderPath + "validate.csv"
@@ -31,6 +33,7 @@ func main() {
 	weights := initWeights(len(data[0]))
 
 	var estimate float64
+	var estimates []float64
 	var errorsTrain []float64
 	var errorsValidate []float64
 	var errorsTest float64
@@ -50,20 +53,30 @@ func main() {
 			}
 		}
 
-		// Compute cylce train error
-		errorsTrain = append(errorsTrain, computeError(data, expectedY, weights))
+		// Compute cycle train error
+		errorsTrain= append(errorsTrain, computeError(data, expectedY, weights))
 		errorsValidate = append(errorsValidate, computeError(validateData, valExpectedY, weights))
 	}
 
 	errorsTest = computeError(testData, testExpectedY, weights)
 
+	for i := range testData {
+		estimate = 0
+		for j := range testData[i] {
+			estimate += testData[i][j] * weights[j]
+		}
+		estimates = append(estimates, estimate)
+	}
+
 	fmt.Println("Test error: ")
 	fmt.Println(errorsTest)
+	fmt.Println("Weights:")
+	fmt.Println(weights)
 
-	createCSV(errorsTrain, errorsValidate)
+	createCSV(*outputPath, errorsTrain, errorsValidate, weights, estimates)
 }
 
-// TODO: refacto to improve performance (S.O. QUESTION)
+// TODO: refactor to improve performance (S.O. QUESTION)
 func readCSV(filepath string) ([][]float64, []float64) {
 
 	csvfile, err := os.Open(filepath)
@@ -101,7 +114,7 @@ func readCSV(filepath string) ([][]float64, []float64) {
 func initWeights(length int) []float64 {
 
 	weights := make([]float64, length)
-	//Inits the slice with random numbers betwen [-1, 1]
+	//Inits the slice with random numbers between [-1, 1]
 	for index := range weights {
 		w := rand.Float64()
 		s := rand.Float64()
@@ -115,30 +128,48 @@ func initWeights(length int) []float64 {
 	return weights
 }
 
-func createCSV(train []float64, validate []float64) {
+func createCSV(path string, train []float64, validate []float64, weights []float64, estimates []float64 ) {
 
-	//TODO Add to existing file instead of creating one each time
+	var filePath string
 
-	file, _ := os.Create("/Users/plorenzo/dev/uni/rna/errores/total.csv")
+	if path == "." {
+		filePath = "errors.csv"
+	}else {
+		filePath = path
+	}
+
+	file, _ := os.Create(filePath)
 	defer file.Close()
 
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
 
-	var strings []string
-	var strings1 []string
+	trainS := []string{"Train"}
+	validateS := []string{"Validate"}
+	weightsS := []string{"Weights"}
+	estimatesS := []string{"Estimates"}
+
 
 	for i := range train {
-		strings = append(strings, strconv.FormatFloat(train[i], 'f', 6, 64))
+		trainS = append(trainS, strconv.FormatFloat(train[i], 'f', 6, 64))
 	}
 	for i := range validate {
-		strings1 = append(strings1, strconv.FormatFloat(validate[i], 'f', 6, 64))
+		validateS = append(validateS, strconv.FormatFloat(validate[i], 'f', 6, 64))
 	}
-	writer.Write(strings)
-	writer.Write(strings1)
+	for i :=range estimates {
+		estimatesS = append(estimatesS, strconv.FormatFloat(estimates[i], 'f', 6, 64))
+	}
+	for i := range weights {
+		weightsS = append(weightsS, strconv.FormatFloat(weights[i], 'f', 6, 64))
+	}
+
+	writer.Write(trainS)
+	writer.Write(validateS)
+	writer.Write(estimatesS)
+	writer.Write(weightsS)
 }
 
-func computeError(data [][]float64, expected []float64, weights []float64) float64 {
+func computeError(data [][]float64, expected []float64, weights []float64) float64  {
 
 	var errors float64
 	var errorSum, estimate float64 = 0, 0
