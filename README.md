@@ -53,9 +53,11 @@ Example:
 The neuron will output the squared error obtained in the test data and the weights used.
 ```
 Test error:
-0.01679312618529568
+0.017166281479163065
+Weights:
+[0.6283026308947595 0.5098346273068519 0.2182228283924059 -0.2505429228543444 0.11335767250598956 0.03879773117815263 0.09743364005207034 0.5027576658656207 -0.011776841084895283]
 ```
-Also a csv file with the train and validate error for each cycle, so you can make cool charts like this:
+Also a **csv file** with the train and validate error for each cycle, the neuron output for the test data and the weights used. So you can make cool charts like this:
 
 ![Adaline neuron error chart](https://i.imgur.com/dM1xWom.png)
 
@@ -66,6 +68,6 @@ Features to add, bugs to fix, improvements to make:
 * ~~Add ability to pass file paths from terminal~~
 * ~~Also cycles and learning rate~~
 * Refactor readCSV() to convert to float64 whiles reads
-* Change createCSV() to append to file instead of creating a new one each time
-* Add optional flag for path to error output csv
-* Print final weights
+* ~~Add optional flag for path to error output csv~~
+* ~~Print final weights~~
+* Make readCSV() calls concurrent
