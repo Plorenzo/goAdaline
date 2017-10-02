@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"strconv"
 )
 
@@ -19,12 +20,11 @@ func main() {
 	)
 	flag.Parse()
 
+	trainPath := filepath.Join(*folderPath, "train.csv")
+	validatePath := filepath.Join(*folderPath, "validate.csv")
+	testPath := filepath.Join(*folderPath, "test.csv")
 
-	trainPath := *folderPath + "train.csv"
-	validatePath := *folderPath + "validate.csv"
-	testPath := *folderPath + "test.csv"
-
-	//Read data from csv file
+	// Read data from csv file
 	data, expectedY := readCSV(trainPath)
 	validateData, valExpectedY := readCSV(validatePath)
 	testData, testExpectedY := readCSV(testPath)
