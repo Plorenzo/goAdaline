@@ -42,13 +42,15 @@ func main() {
 	var errorsTest float64
 
 	// Learning
-	for i := 0; i < *cycles; i++ {
-		for j := 0; j < nrows; j++ {
+	for cycle := 0; cycle < *cycles; cycle++ {
+		var row mat.VecDense
+		for i := 0; i < nrows; i++ {
+			row.RowViewOf(data, i)
 			// Calculate estimate
-			estimate := mat.Dot(data.RowView(j), weights)
+			estimate := mat.Dot(&row, weights)
 			// Update weights (range passes values as a copy)
 			for x, weight := range weights.RawVector().Data {
-				weight += *learningRate * (expectedY.At(j, 0) - estimate) * data.At(j, x)
+				weight += *learningRate * (expectedY.At(i, 0) - estimate) * data.At(i, x)
 				weights.SetVec(x, weight)
 			}
 		}
