@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"flag"
 	"fmt"
+	"log"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -29,7 +30,7 @@ func main() {
 	validateData, valExpectedY := readCSV(validatePath)
 	testData, testExpectedY := readCSV(testPath)
 
-	//Init weights randomly [-1,1]
+	// Init weights randomly [-1,1]
 	weights := initWeights(len(data[0]))
 
 	var estimate float64
@@ -81,12 +82,15 @@ func readCSV(filepath string) ([][]float64, []float64) {
 
 	csvfile, err := os.Open(filepath)
 	if err != nil {
-		return nil, nil
+		log.Fatalf("could not open %q: %v", filepath, err)
 	}
 
 	reader := csv.NewReader(csvfile)
 	reader.Comma = ';'
 	stringMatrix, err := reader.ReadAll()
+	if err != nil {
+		log.Fatalf("could not decode CSV file: %v", err)
+	}
 
 	csvfile.Close()
 
@@ -99,9 +103,15 @@ func readCSV(filepath string) ([][]float64, []float64) {
 		for j := range stringMatrix[i] {
 			if j < 8 {
 				matrix[i][j], err = strconv.ParseFloat(stringMatrix[i][j], 64)
+				if err != nil {
+					log.Fatalf("could not parse float %q: %v", stringMatrix[i][j], err)
+				}
 			} else {
 				//Extract expected output date from file (last column)
 				expectedY[i], err = strconv.ParseFloat(stringMatrix[i][j], 64)
+				if err != nil {
+					log.Fatalf("could not parse float %q: %v", stringMatrix[i][j], err)
+				}
 				matrix[i][j] = 1
 			}
 
@@ -138,11 +148,13 @@ func createCSV(path string, train []float64, validate []float64, weights []float
 		filePath = path
 	}
 
-	file, _ := os.Create(filePath)
+	file, err := os.Create(filePath)
+	if err != nil {
+		log.Fatal(err)
+	}
 	defer file.Close()
 
 	writer := csv.NewWriter(file)
-	defer writer.Flush()
 
 	trainS := []string{"Train"}
 	validateS := []string{"Validate"}
@@ -162,10 +174,18 @@ func createCSV(path string, train []float64, validate []float64, weights []float
 		weightsS = append(weightsS, strconv.FormatFloat(weights[i], 'f', 6, 64))
 	}
 
-	writer.Write(trainS)
-	writer.Write(validateS)
-	writer.Write(estimatesS)
-	writer.Write(weightsS)
+	for _, v := range [][]string{trainS, validateS, estimatesS, weightsS} {
+		err = writer.Write(v)
+		if err != nil {
+			log.Fatalf("could not write back sample: %v", err)
+		}
+	}
+
+	writer.Flush()
+	err = file.Close()
+	if err != nil {
+		log.Fatalf("could not write back data to file: %v", err)
+	}
 }
 
 func computeError(data [][]float64, expected []float64, weights []float64) float64 {
