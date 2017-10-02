@@ -126,14 +126,8 @@ func initWeights(length int) []float64 {
 	weights := make([]float64, length)
 	//Inits the slice with random numbers between [-1, 1]
 	for index := range weights {
-		w := rand.Float64()
-		s := rand.Float64()
-
-		if s < 0.5 {
-			weights[index] = w
-		} else {
-			weights[index] = w * -1
-		}
+		w := 2*rand.Float64() - 1
+		weights[index] = w
 	}
 	return weights
 }
