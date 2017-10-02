@@ -12,10 +12,10 @@ import (
 func main() {
 
 	var (
-		folderPath   	= flag.String("path", ".", "Path to the datasets")
-		cycles			= flag.Int("cycles", 1, "Nº of training cycles")
-		learningRate	= flag.Float64("lr", 0.1, "Learning rate of the neuron")
-		outputPath		= flag.String("out", ".", "Path to save the output file")
+		folderPath   = flag.String("path", ".", "Path to the datasets")
+		cycles       = flag.Int("cycles", 1, "Nº of training cycles")
+		learningRate = flag.Float64("lr", 0.1, "Learning rate of the neuron")
+		outputPath   = flag.String("out", ".", "Path to save the output file")
 	)
 	flag.Parse()
 
@@ -54,7 +54,7 @@ func main() {
 		}
 
 		// Compute cycle train error
-		errorsTrain= append(errorsTrain, computeError(data, expectedY, weights))
+		errorsTrain = append(errorsTrain, computeError(data, expectedY, weights))
 		errorsValidate = append(errorsValidate, computeError(validateData, valExpectedY, weights))
 	}
 
@@ -128,13 +128,13 @@ func initWeights(length int) []float64 {
 	return weights
 }
 
-func createCSV(path string, train []float64, validate []float64, weights []float64, estimates []float64 ) {
+func createCSV(path string, train []float64, validate []float64, weights []float64, estimates []float64) {
 
 	var filePath string
 
 	if path == "." {
 		filePath = "errors.csv"
-	}else {
+	} else {
 		filePath = path
 	}
 
@@ -149,14 +149,13 @@ func createCSV(path string, train []float64, validate []float64, weights []float
 	weightsS := []string{"Weights"}
 	estimatesS := []string{"Estimates"}
 
-
 	for i := range train {
 		trainS = append(trainS, strconv.FormatFloat(train[i], 'f', 6, 64))
 	}
 	for i := range validate {
 		validateS = append(validateS, strconv.FormatFloat(validate[i], 'f', 6, 64))
 	}
-	for i :=range estimates {
+	for i := range estimates {
 		estimatesS = append(estimatesS, strconv.FormatFloat(estimates[i], 'f', 6, 64))
 	}
 	for i := range weights {
@@ -169,7 +168,7 @@ func createCSV(path string, train []float64, validate []float64, weights []float
 	writer.Write(weightsS)
 }
 
-func computeError(data [][]float64, expected []float64, weights []float64) float64  {
+func computeError(data [][]float64, expected []float64, weights []float64) float64 {
 
 	var errors float64
 	var errorSum, estimate float64 = 0, 0
