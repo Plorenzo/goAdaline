@@ -49,9 +49,9 @@ func main() {
 			// Calculate estimate
 			estimate := mat.Dot(&row, weights)
 			// Update weights (range passes values as a copy)
-			for x, weight := range weights.RawVector().Data {
-				weight += *learningRate * (expectedY.At(i, 0) - estimate) * data.At(i, x)
-				weights.SetVec(x, weight)
+			raw := weights.RawVector().Data
+			for x := range raw {
+				raw[x] += *learningRate * (expectedY.At(i, 0) - estimate) * data.At(i, x)
 			}
 		}
 
