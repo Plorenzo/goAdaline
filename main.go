@@ -53,9 +53,11 @@ func main() {
 	// Init weights randomly [-1,1]
 	weights := initWeights(ncols)
 
-	var errorsTrain []float64
-	var errorsValidate []float64
-	var errorsTest float64
+	var (
+		errorsTrain    = make([]float64, 0, *cycles)
+		errorsValidate = make([]float64, 0, *cycles)
+		errorsTest     float64
+	)
 
 	rate := *learningRate
 	row := blas64.Vector{
