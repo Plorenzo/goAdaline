@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"runtime/pprof"
 	"strconv"
 
 	"gonum.org/v1/gonum/blas/blas64"
@@ -21,8 +22,22 @@ func main() {
 		cycles       = flag.Int("cycles", 1, "Nº of training cycles")
 		learningRate = flag.Float64("lr", 0.1, "Learning rate of the neuron")
 		outputPath   = flag.String("out", ".", "Path to save the output file")
+		doCPU        = flag.Bool("cpu", false, "enable CPU profiling")
 	)
 	flag.Parse()
+
+	if *doCPU {
+		f, err := os.Create("cpu.prof")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer f.Close()
+		err = pprof.StartCPUProfile(f)
+		if err != nil {
+			panic(err)
+		}
+		defer pprof.StopCPUProfile()
+	}
 
 	trainPath := filepath.Join(*folderPath, "train.csv")
 	validatePath := filepath.Join(*folderPath, "validate.csv")
