@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"gonum.org/v1/gonum/blas/blas64"
 	"gonum.org/v1/gonum/mat"
 )
 
@@ -41,17 +42,23 @@ func main() {
 	var errorsValidate []float64
 	var errorsTest float64
 
+	rate := *learningRate
+	row := blas64.Vector{
+		Inc: 1,
+	}
+	raw := data.RawMatrix()
+	exp := expectedY.RawVector()
+	ws := weights.RawVector()
 	// Learning
 	for cycle := 0; cycle < *cycles; cycle++ {
-		var row mat.VecDense
 		for i := 0; i < nrows; i++ {
-			row.RowViewOf(data, i)
+			row.Data = raw.Data[i*raw.Stride:]
+			iexp := exp.Data[i]
 			// Calculate estimate
-			estimate := mat.Dot(&row, weights)
-			// Update weights (range passes values as a copy)
-			raw := weights.RawVector().Data
-			for x := range raw {
-				raw[x] += *learningRate * (expectedY.At(i, 0) - estimate) * data.At(i, x)
+			estimate := blas64.Dot(ncols, row, ws)
+			_ = row.Data[len(ws.Data)-1]
+			for j := range ws.Data {
+				ws.Data[j] += rate * (iexp - estimate) * row.Data[j]
 			}
 		}
 
