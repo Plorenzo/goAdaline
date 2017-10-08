@@ -8,7 +8,11 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"runtime/pprof"
 	"strconv"
+
+	"gonum.org/v1/gonum/blas/blas64"
+	"gonum.org/v1/gonum/mat"
 )
 
 func main() {
@@ -18,8 +22,22 @@ func main() {
 		cycles       = flag.Int("cycles", 1, "Nº of training cycles")
 		learningRate = flag.Float64("lr", 0.1, "Learning rate of the neuron")
 		outputPath   = flag.String("out", ".", "Path to save the output file")
+		doCPU        = flag.Bool("cpu", false, "enable CPU profiling")
 	)
 	flag.Parse()
+
+	if *doCPU {
+		f, err := os.Create("cpu.prof")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer f.Close()
+		err = pprof.StartCPUProfile(f)
+		if err != nil {
+			panic(err)
+		}
+		defer pprof.StopCPUProfile()
+	}
 
 	trainPath := filepath.Join(*folderPath, "train.csv")
 	validatePath := filepath.Join(*folderPath, "validate.csv")
@@ -30,27 +48,34 @@ func main() {
 	validateData, valExpectedY := readCSV(validatePath)
 	testData, testExpectedY := readCSV(testPath)
 
+	nrows, ncols := data.Dims()
+
 	// Init weights randomly [-1,1]
-	weights := initWeights(len(data[0]))
+	weights := initWeights(ncols)
 
-	var estimate float64
-	var estimates []float64
-	var errorsTrain []float64
-	var errorsValidate []float64
-	var errorsTest float64
+	var (
+		errorsTrain    = make([]float64, 0, *cycles)
+		errorsValidate = make([]float64, 0, *cycles)
+		errorsTest     float64
+	)
 
+	rate := *learningRate
+	row := blas64.Vector{
+		Inc: 1,
+	}
+	raw := data.RawMatrix()
+	exp := expectedY.RawVector()
+	ws := weights.RawVector()
 	// Learning
-	for i := 0; i < *cycles; i++ {
-		for j := range data {
-			//Calculate estimate
-			estimate = 0
-			for x := range data[j] {
-				estimate += data[j][x] * weights[x]
-			}
-
-			// Update weights (range passes values as a copy)
-			for x := 0; x < len(weights); x++ {
-				weights[x] += *learningRate * (expectedY[j] - estimate) * data[j][x]
+	for cycle := 0; cycle < *cycles; cycle++ {
+		for i := 0; i < nrows; i++ {
+			row.Data = raw.Data[i*raw.Stride:]
+			iexp := exp.Data[i]
+			// Calculate estimate
+			estimate := blas64.Dot(ncols, row, ws)
+			_ = row.Data[len(ws.Data)-1]
+			for j := range ws.Data {
+				ws.Data[j] += rate * (iexp - estimate) * row.Data[j]
 			}
 		}
 
@@ -61,75 +86,73 @@ func main() {
 
 	errorsTest = computeError(testData, testExpectedY, weights)
 
-	for i := range testData {
-		estimate = 0
-		for j := range testData[i] {
-			estimate += testData[i][j] * weights[j]
-		}
-		estimates = append(estimates, estimate)
-	}
+	var estimates mat.VecDense
+	estimates.MulVec(testData, weights)
 
 	fmt.Println("Test error: ")
 	fmt.Println(errorsTest)
 	fmt.Println("Weights:")
-	fmt.Println(weights)
+	fmt.Println(weights.RawVector().Data)
 
-	createCSV(*outputPath, errorsTrain, errorsValidate, weights, estimates)
+	createCSV(*outputPath, errorsTrain, errorsValidate, weights.RawVector().Data, estimates.RawVector().Data)
 }
 
-// TODO: refactor to improve performance (S.O. QUESTION)
-func readCSV(filepath string) ([][]float64, []float64) {
+func readCSV(filepath string) (*mat.Dense, *mat.VecDense) {
 
 	csvfile, err := os.Open(filepath)
 	if err != nil {
 		log.Fatalf("could not open %q: %v", filepath, err)
 	}
+	defer csvfile.Close()
 
 	reader := csv.NewReader(csvfile)
 	reader.Comma = ';'
-	stringMatrix, err := reader.ReadAll()
+	records, err := reader.ReadAll()
 	if err != nil {
 		log.Fatalf("could not decode CSV file: %v", err)
 	}
 
-	csvfile.Close()
+	nrows := len(records)
+	ncols := len(records[0])
 
-	matrix := make([][]float64, len(stringMatrix))
-	expectedY := make([]float64, len(stringMatrix))
+	m := mat.NewDense(nrows, ncols, nil)
+	y := mat.NewVecDense(nrows, nil)
 
-	//Parse string matrix into float64
-	for i := range stringMatrix {
-		matrix[i] = make([]float64, len(stringMatrix[0]))
-		for j := range stringMatrix[i] {
+	// Parse string matrix into float64
+	for i, record := range records {
+		for j, str := range record {
+			var v float64 = 1
 			if j < 8 {
-				matrix[i][j], err = strconv.ParseFloat(stringMatrix[i][j], 64)
+				v, err = strconv.ParseFloat(str, 64)
 				if err != nil {
-					log.Fatalf("could not parse float %q: %v", stringMatrix[i][j], err)
+					log.Fatalf("could not parse float %q: %v", str, err)
 				}
 			} else {
-				//Extract expected output date from file (last column)
-				expectedY[i], err = strconv.ParseFloat(stringMatrix[i][j], 64)
+				var yv float64
+				// Extract expected output date from file (last column)
+				yv, err = strconv.ParseFloat(str, 64)
 				if err != nil {
-					log.Fatalf("could not parse float %q: %v", stringMatrix[i][j], err)
+					log.Fatalf("could not parse float %q: %v", str, err)
 				}
-				matrix[i][j] = 1
+				y.SetVec(i, yv)
 			}
+			m.Set(i, j, v)
 
 		}
 	}
-	return matrix, expectedY
+	return m, y
 }
 
-//This also inits the threshold
-func initWeights(length int) []float64 {
+// This also inits the threshold
+func initWeights(length int) *mat.VecDense {
 
 	weights := make([]float64, length)
-	//Inits the slice with random numbers between [-1, 1]
+	// Inits the slice with random numbers between [-1, 1]
 	for index := range weights {
 		w := 2*rand.Float64() - 1
 		weights[index] = w
 	}
-	return weights
+	return mat.NewVecDense(length, weights)
 }
 
 func createCSV(path string, train []float64, validate []float64, weights []float64, estimates []float64) {
@@ -171,7 +194,7 @@ func createCSV(path string, train []float64, validate []float64, weights []float
 	for _, v := range [][]string{trainS, validateS, estimatesS, weightsS} {
 		err = writer.Write(v)
 		if err != nil {
-			log.Fatalf("could not write back sample: %v", err)
+			log.Fatalf("could not write back sample %q: %v", v[0], err)
 		}
 	}
 
@@ -182,20 +205,12 @@ func createCSV(path string, train []float64, validate []float64, weights []float
 	}
 }
 
-func computeError(data [][]float64, expected []float64, weights []float64) float64 {
+func computeError(data *mat.Dense, expected, weights *mat.VecDense) float64 {
 
-	var errors float64
-	var errorSum, estimate float64 = 0, 0
+	var errs mat.VecDense
+	errs.MulVec(data, weights)
+	errs.SubVec(expected, &errs)
+	errs.MulElemVec(&errs, &errs)
 
-	for i := range data {
-		estimate = 0
-		for j := range data[i] {
-			estimate += data[i][j] * weights[j]
-		}
-		// Squared error E = (Yd - Ye)^2
-		errorSum += (expected[i] - estimate) * (expected[i] - estimate)
-	}
-	errors = errorSum / float64(len(data))
-
-	return errors
+	return mat.Sum(&errs) / float64(errs.Len())
 }
